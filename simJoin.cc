@@ -32,36 +32,6 @@ bool inverted_list::exist(int len)
 		return true;
 	}
 }
-
-void inverted_list::print(int c)
-{
-	cout << "-----------------------------------------------" << endl;
-	for (int i = 0; i < len_list.size(); i++)
-	{
-		int tmp_num = len_list[i];
-		cout << "len = " << len_list[i] << endl;
-		for (int j = 0; j < c; j++)
-		{
-			cout << "c=" << j << endl;
-			map<string, vector<int>> tmp = list[len_list[i]][j];
-			map<string, vector<int>>::iterator iter;
-			iter = tmp.begin();
-			while (iter != tmp.end())
-			{
-				string tmp_str = iter->first;
-				vector<int> tmp_list = iter->second;
-				cout << tmp_str << endl;
-				for (int k = 0; k < tmp_list.size(); k++)
-				{
-					cout << tmp_list[k] << endl;
-				}
-				iter++;
-			}
-		}
-	}
-	cout << "-----------------------------------------------" << endl;
-}
-
 int simJoin::getDataNum() const
 {
 	return data.size();
@@ -97,20 +67,24 @@ bool simJoin::readData(const string& filename)
 */
 
 
-int simJoin::edit_distance(string s1, string s2)
+int simJoin::edit_distance(string s1, string s2, int threshold)
 {
 	int len_s1 = s1.length();
 	int len_s2 = s2.length();
+	if (len_s1 == 0 || len_s2 == 0)
+	{
+	    return abs(len_s1 - len_s2);
+	}
 	int delta = len_s1 - len_s2;
-	vector<vector <int> > dp(len_s2 + 1, vector <int>(len_s1 + 1, ed_threshold + 99));
+	vector<vector <int> > dp(len_s2 + 1, vector <int>(len_s1 + 1, threshold + 99));
 
 	for (int i = 0; i <= len_s1; i++) dp[0][i] = i;
 	for (int j = 0; j <= len_s2; j++) dp[j][0] = j;
 
 	for (int i = 1; i <= len_s2; i++)
 	{
-		int start = max(1, i - (ed_threshold - delta) / 2);
-		int end = min(len_s1, i + (ed_threshold + delta) / 2);
+		int start = max(1, i - (threshold - delta) / 2);
+		int end = min(len_s1, i + (threshold + delta) / 2);
 		bool terminate = true;
 
 		for (int j = start; j <= end; j++)
@@ -121,16 +95,35 @@ int simJoin::edit_distance(string s1, string s2)
 
 			dp[i][j] = min(dis1, dis2);
 			dp[i][j] = min(dp[i][j], dis3);
-			if (dp[i][j] <= ed_threshold) terminate = false;
+			if (dp[i][j] <= threshold) terminate = false;
 		}
-		if (terminate) return ed_threshold + 99;
+		if (terminate) return threshold + 99;
 	}
 
 	return dp[len_s2][len_s1];
 };
 
-void simJoin::select_substring(string s, map<string, vector<int>> dict, int str_l, int& cur_pos, int i, set<int>& candidate)
+int simJoin::extension_based_verrification(string s11, string s12, string s21, string s22, int i)
 {
+	int threshold1 = i - 1;
+	int threshold2 = ed_threshold + 1 - i;
+	int d1 = edit_distance(s11, s21, threshold1);
+	if (d1 <= threshold1)
+	{
+		int d2 = edit_distance(s12, s22, threshold2);
+		{
+			if (d2 <= threshold2)
+			{
+				return d1 + d2;
+			}
+		}
+	}
+	return ed_threshold + 99;
+};
+
+void simJoin::select_substring(int s_id, map<string, vector<int>> dict, int str_l, int& cur_pos, int i, set<int>& candidate, vector< triple<unsigned, unsigned, unsigned> >& results)
+{
+	string s = data[s_id];
 	int delta = s.length() - str_l;
 	int start_pos = max(cur_pos - (i - 1), cur_pos + delta - (ed_threshold + 1 - i));
 	int end_pos = min(cur_pos + (i - 1), cur_pos + delta + (ed_threshold + 1 - i));
@@ -143,17 +136,33 @@ void simJoin::select_substring(string s, map<string, vector<int>> dict, int str_
 	{
 		string tmp_str = iter->first;
 		vector<int> tmp_list = iter->second;
-		/*cout << "target " << tmp_str << endl;*/
+		//cout << "target " << tmp_str << endl;
 		for (int pos = start_pos; pos <= end_pos; pos++)
 		{
 			string sub_str = s.substr(pos, cur_len);
-			/*cout << sub_str << " ";*/
+			//cout << sub_str << " ";
 			if (sub_str == tmp_str)
 			{
-				/*cout << "(match)" << " ";*/
-				for (i = 0; i < tmp_list.size(); i++)
+				//cout << "(match)" << " ";
+				for (int j = 0; j < tmp_list.size(); j++)
 				{
-					candidate.insert(tmp_list[i]);
+					set<int>::iterator it;
+					it = candidate.find(tmp_list[j]);
+					if (it == candidate.end())
+					{
+						int r = tmp_list[j];	
+						string s11 = s.substr(0, pos);
+						string s12 = s.substr(pos + cur_len, s.length() - pos - cur_len);
+						string s21 = data[r].substr(0, cur_pos);
+						string s22 = data[r].substr(cur_pos + cur_len, s.length() - cur_pos - cur_len);
+						int ed_distance = extension_based_verrification(s11, s12, s21, s22, i);
+						if (ed_distance <= ed_threshold)
+						{
+							candidate.insert(r);
+							triple<unsigned, unsigned, unsigned> tmp_ans = { s_id, r, ed_distance };
+							results.push_back(tmp_ans);
+						}
+					}
 				}
 			}
 		}
@@ -185,26 +194,8 @@ bool simJoin::SimilarityJoin(unsigned threshold, vector< triple<unsigned, unsign
 				{
 					map<string, vector<int>> tmp_dict;
 					tmp_dict = my_list.get_ele(tmp_len, cnt);
-					select_substring(s, tmp_dict, tmp_len, cur_pos, cnt + 1, candidates);
+					select_substring(i, tmp_dict, tmp_len, cur_pos, cnt + 1, candidates, results);
 				}
-
-				set<int>::iterator iter;
-				iter = candidates.begin();
-				while (iter != candidates.end())
-				{
-					/*cout << "-----------------------------------------------" << endl;
-					cout << "matching: " << endl;
-					cout << s << " " << data[*iter] << " " << endl;*/
-					int dis = edit_distance(s, data[*iter]);
-					/*cout << s << " " << data[*iter] << " " << dis << endl;*/
-					if (dis <= ed_threshold)
-					{
-						triple<unsigned, unsigned, unsigned> tmp_ans = { i, *iter, dis };
-						results.push_back(tmp_ans);
-					}
-					iter++;
-				}
-				/*cout << "-----------------------------------------------" << endl;*/
 			}
 		}
 		int curr_pos = 0;
