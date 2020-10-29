@@ -7,6 +7,7 @@
 #include <map>
 #include <math.h> 
 #include <set>
+#include <stdlib.h>
 
 
 using namespace std;
@@ -56,7 +57,8 @@ private:
 	vector<int> len_data;
 	int ed_threshold;
 	bool readData(const string& filename);
-	int edit_distance(string s1, string s2);
-	void select_substring(string s, map<string, vector<int>> dict, int str_l, int& cur_pos, int i, set<int>& candidate);
+	int edit_distance(string s1, string s2, int threshold);
+	int extension_based_verrification(string s11, string s12, string s21, string s22, int i);
+	void select_substring(int s, map<string, vector<int>> dict, int str_l, int& cur_pos, int i, set<int>& candidate, vector< triple<unsigned, unsigned, unsigned> >& results);
 };
 #pragma once
