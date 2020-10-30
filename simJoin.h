@@ -24,7 +24,7 @@ class inverted_list
 {
 private:
 	int cnt;
-	vector<int> len_list;
+	// vector<int> len_list;
 	map<int, vector<map<string, vector<int>>>> list;
 
 public:
