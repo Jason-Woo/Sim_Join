@@ -2,10 +2,12 @@
 
 void inverted_list::insert_ele(int len, int c, string s, int id)
 {
-	vector<int>::iterator it = find(len_list.begin(), len_list.end(), len);
-	if (it == len_list.end())
+	// vector<int>::iterator it = find(len_list.begin(), len_list.end(), len);
+	map<int, vector<map<string, vector<int>>>>::iterator it;
+	it = list.find(len);
+	if (it == list.end())
 	{
-		len_list.push_back(len);
+		// len_list.push_back(len);
 		for (int i = 0; i < cnt; i++)
 		{
 			map<string, vector<int>> ele;
@@ -22,8 +24,9 @@ map<string, vector<int>> inverted_list::get_ele(int len, int c)
 
 bool inverted_list::exist(int len)
 {
-	vector<int>::iterator it = find(len_list.begin(), len_list.end(), len);
-	if (it == len_list.end())
+	map<int, vector<map<string, vector<int>>>>::iterator it;
+	it = list.find(len);
+	if (it == list.end())
 	{
 		return false;
 	}
@@ -31,7 +34,9 @@ bool inverted_list::exist(int len)
 	{
 		return true;
 	}
+	
 }
+
 int simJoin::getDataNum() const
 {
 	return data.size();
@@ -76,10 +81,10 @@ int simJoin::edit_distance(string s1, string s2, int threshold)
 	    return abs(len_s1 - len_s2);
 	}
 	int delta = len_s1 - len_s2;
-	vector<vector <int> > dp(len_s2 + 1, vector <int>(len_s1 + 1, threshold + 99));
-
+	int dp[len_s2 + 1][len_s1 + 1];
 	for (int i = 0; i <= len_s1; i++) dp[0][i] = i;
 	for (int j = 0; j <= len_s2; j++) dp[j][0] = j;
+	dp[len_s2][len_s1] = threshold + 99;
 
 	for (int i = 1; i <= len_s2; i++)
 	{
@@ -90,7 +95,9 @@ int simJoin::edit_distance(string s1, string s2, int threshold)
 		for (int j = start; j <= end; j++)
 		{
 			int dis1 = dp[i - 1][j] + 1;
+			if (j == i + (threshold + delta) / 2) dis1 = threshold + 99;
 			int dis2 = dp[i][j - 1] + 1;
+			if (j == i - (threshold - delta) / 2) dis2 = threshold + 99;
 			int dis3 = (s1[j - 1] == s2[i - 1]) ? dp[i - 1][j - 1] : dp[i - 1][j - 1] + 1;
 
 			dp[i][j] = min(dis1, dis2);
@@ -127,47 +134,50 @@ void simJoin::select_substring(int s_id, map<string, vector<int>> dict, int str_
 	int delta = s.length() - str_l;
 	int start_pos = max(cur_pos - (i - 1), cur_pos + delta - (ed_threshold + 1 - i));
 	int end_pos = min(cur_pos + (i - 1), cur_pos + delta + (ed_threshold + 1 - i));
-	/*cout << "String= " << s << ", start= " << start_pos << ", end= " << end_pos << endl;
-	cout << "p " << cur_pos << ",i " << i << ",delta " << delta << ",tao " << ed_threshold << endl;*/
-	map<string, vector<int>>::iterator iter;
-	iter = dict.begin();
-	int cur_len = iter->first.length();
-	while (iter != dict.end())
+	//cout << "String= " << s << ", start= " << start_pos << ", end= " << end_pos << endl;
+	//cout << "p " << cur_pos << ",i " << i << ",delta " << delta << ",tao " << ed_threshold << endl;
+	
+	int k = str_l - str_l / (ed_threshold + 1) * (ed_threshold + 1);
+	int cur_len = 0;
+	if (i <= ed_threshold + 1 - k)
 	{
-		string tmp_str = iter->first;
-		vector<int> tmp_list = iter->second;
-		//cout << "target " << tmp_str << endl;
-		for (int pos = start_pos; pos <= end_pos; pos++)
+		cur_len = str_l / (ed_threshold + 1);
+	}
+	else
+	{
+		cur_len = ceil(double(str_l) / (double(ed_threshold) + 1));
+	}
+	
+	for (int pos = start_pos; pos <= end_pos; pos++)
+	{
+		string sub_str = s.substr(pos, cur_len);
+		//cout << sub_str << " ";
+		map<string, vector<int>>::iterator iter;
+		iter = dict.find(sub_str);
+		if (iter != dict.end())
 		{
-			string sub_str = s.substr(pos, cur_len);
-			//cout << sub_str << " ";
-			if (sub_str == tmp_str)
+			//cout << "(match)" << " ";
+			for (int j = 0; j < dict[sub_str].size(); j++)
 			{
-				//cout << "(match)" << " ";
-				for (int j = 0; j < tmp_list.size(); j++)
+				set<int>::iterator it;
+				it = candidate.find(dict[sub_str][j]);
+				if (it == candidate.end())
 				{
-					set<int>::iterator it;
-					it = candidate.find(tmp_list[j]);
-					if (it == candidate.end())
+					int r = dict[sub_str][j];	
+					string s11 = s.substr(0, pos);
+					string s12 = s.substr(pos + cur_len, s.length() - pos - cur_len);
+					string s21 = data[r].substr(0, cur_pos);
+					string s22 = data[r].substr(cur_pos + cur_len, s.length() - cur_pos - cur_len);
+					int ed_distance = extension_based_verrification(s11, s12, s21, s22, i);
+					if (ed_distance <= ed_threshold)
 					{
-						int r = tmp_list[j];	
-						string s11 = s.substr(0, pos);
-						string s12 = s.substr(pos + cur_len, s.length() - pos - cur_len);
-						string s21 = data[r].substr(0, cur_pos);
-						string s22 = data[r].substr(cur_pos + cur_len, s.length() - cur_pos - cur_len);
-						int ed_distance = extension_based_verrification(s11, s12, s21, s22, i);
-						if (ed_distance <= ed_threshold)
-						{
-							candidate.insert(r);
-							triple<unsigned, unsigned, unsigned> tmp_ans = { s_id, r, ed_distance };
-							results.push_back(tmp_ans);
-						}
+						candidate.insert(r);
+						triple<unsigned, unsigned, unsigned> tmp_ans = { s_id, r, ed_distance };
+						results.push_back(tmp_ans);
 					}
 				}
 			}
 		}
-		/*cout << endl;*/
-		iter++;
 	}
 	cur_pos += cur_len;
 }
@@ -180,6 +190,10 @@ bool simJoin::SimilarityJoin(unsigned threshold, vector< triple<unsigned, unsign
 
 	for (int i = 0; i < data_size; i++)
 	{
+		if (i%100==0)
+		{
+			cout << i<<endl;
+		}
 		string s = data[i];
 		int len_s = len_data[i];
 		int len_min = min(len_s - ed_threshold, 1);
